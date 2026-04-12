@@ -30,13 +30,35 @@ gcloud builds submit --tag gcr.io/$ProjectID/$ServiceName --project $ProjectID
 
 # 3. Deploy to Cloud Run
 Write-Host "Deploying to Cloud Run..." -ForegroundColor Yellow
-gcloud run deploy $ServiceName `
-    --image gcr.io/$ProjectID/$ServiceName `
-    --region $Region `
-    --project $ProjectID `
-    --platform managed `
-    --allow-unauthenticated `
-    --port 3000
+
+$EnvVars = ""
+if (Test-Path ".env.local") {
+    $EnvContent = Get-Content ".env.local"
+    foreach ($line in $EnvContent) {
+        if ($line -match "^GEMINI_API_KEY=(.*)") {
+            $EnvVars += "GEMINI_API_KEY=$($matches[1].Trim())"
+        }
+    }
+}
+
+if ($EnvVars) {
+    gcloud run deploy $ServiceName `
+        --image gcr.io/$ProjectID/$ServiceName `
+        --region $Region `
+        --project $ProjectID `
+        --platform managed `
+        --allow-unauthenticated `
+        --port 3000 `
+        --set-env-vars="$EnvVars"
+} else {
+    gcloud run deploy $ServiceName `
+        --image gcr.io/$ProjectID/$ServiceName `
+        --region $Region `
+        --project $ProjectID `
+        --platform managed `
+        --allow-unauthenticated `
+        --port 3000
+}
 
 Write-Host "Deployment Completed!" -ForegroundColor Green
 Write-Host "Please check the generated URL in the Cloud Run output above."

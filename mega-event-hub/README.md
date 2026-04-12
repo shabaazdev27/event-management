@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ArenaLink Mega-Event Hub
+
+The Mega-Event Hub is the core Next.js web application for the **ArenaLink** platform. It provides a dynamic, real-time dashboard for comprehensive event management, gate security monitoring, active crowd tracking, and interactive attendee engagement.
+
+## Key Features
+- **Multi-Tenant Event Management**: Full CRUD capabilities and scalable architecture for managing multiple event operations seamlessly.
+- **Live Gate Security Feeds**: Stream various media formats with automated, data-driven alerts derived from real-time queue metrics.
+- **CrowdVision Overlay**: Density and flow monitoring to proactively manage crowds.
+- **FanZone Gamification**: High-energy, gamified experiences to keep attendees engaged during down-time.
+- **Gemini AI Integration**: AI-driven features to optimize both staff workflow and attendee inquiries.
+
+## Tech Stack
+- **Framework:** Next.js (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS & Lucide React
+- **Services:** Firebase (Firestore real-time updates) and Gemini API
 
 ## Getting Started
 
-First, run the development server:
-
+### 1. Install Dependencies
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Environment Variables
+Create a `.env.local` file from `.env.example` and ensure you add the necessary Firebase credentials as well as your local AI keys:
+```env
+NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_key_here
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Run the Development Server
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result. You can start editing by modifying `app/page.tsx` or other relevant components in `/src`.

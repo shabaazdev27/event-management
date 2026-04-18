@@ -8,6 +8,7 @@ const alias = {
 export default defineConfig({
   resolve: { alias },
   test: {
+    setupFiles: ["./src/vitest-setup.ts"],
     projects: [
       {
         test: {

@@ -12,6 +12,7 @@ type WeatherPayload = {
   tempC: number;
   condition: string;
   rainChancePercent: number | null;
+  isFallback?: boolean;
 };
 
 function StatRow({
@@ -47,7 +48,10 @@ export default function EventDetails() {
 
   useEffect(() => {
     const metricsRef = venuePaths.metricsDoc(venueId);
-    const unsubscribe = onSnapshot(metricsRef, (snap) => {
+    const unsubscribe = onSnapshot(
+      metricsRef,
+      { includeMetadataChanges: true },
+      (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (data.global_status?.occupancy_percent !== undefined) {
@@ -61,26 +65,51 @@ export default function EventDetails() {
   const loadWeather = useCallback(async () => {
     setWeatherLoading(true);
     setWeatherErr(null);
+    
     try {
       const params = new URLSearchParams({
         lat: String(venue.lat),
         lon: String(venue.lon),
         timezone: venue.timezone,
       });
-      const res = await fetch(`/api/weather?${params.toString()}`);
+
+      // Add timeout for weather fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const res = await fetch(`/api/weather?${params.toString()}`, {
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+
       const data = await res.json();
-      if (!res.ok) {
+      
+      if (!res.ok && !data.isFallback) {
         throw new Error(data.error || "Weather request failed");
       }
+      
       setWeather({
         tempF: data.tempF,
         tempC: data.tempC,
         condition: data.condition,
         rainChancePercent: data.rainChancePercent,
+        isFallback: data.isFallback,
       });
     } catch (e: unknown) {
-      setWeatherErr(e instanceof Error ? e.message : "Weather unavailable");
-      setWeather(null);
+      if (e instanceof Error && e.name === "AbortError") {
+        // Timeout - use fallback data
+        setWeather({
+          tempC: 20,
+          tempF: 68,
+          condition: "Clear",
+          rainChancePercent: 10,
+          isFallback: true,
+        });
+      } else {
+        setWeatherErr(e instanceof Error ? e.message : "Weather unavailable");
+        setWeather(null);
+      }
     } finally {
       setWeatherLoading(false);
     }
@@ -135,8 +164,11 @@ export default function EventDetails() {
                   {Math.round(weather!.tempF)}°F
                   <span className="text-sm text-neutral-500 ml-2">
                     ({weather!.tempC}°C)
-                  </span>
-                </span>
+                  </span>                  {weather!.isFallback && (
+                    <span className="text-xs text-amber-500/70 ml-2" title="Using fallback weather data">
+                      (fallback)
+                    </span>
+                  )}                </span>
                 <span className="block text-xs text-neutral-400 mt-0.5">
                   {weather!.condition}
                 </span>

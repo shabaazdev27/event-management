@@ -123,34 +123,32 @@ describe("readJsonBodyLimited", () => {
 });
 
 describe("assertCronAuthorized", () => {
-  const prevEnv = process.env;
-
   beforeEach(() => {
     vi.resetModules();
-    process.env = { ...prevEnv };
+    vi.unstubAllEnvs();
   });
 
   afterEach(() => {
-    process.env = prevEnv;
+    vi.unstubAllEnvs();
   });
 
   it("allows when CRON_SECRET unset in development", () => {
-    process.env.NODE_ENV = "development";
-    delete process.env.CRON_SECRET;
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("CRON_SECRET", "");
     const res = assertCronAuthorized(new Request("http://t"));
     expect(res).toBeNull();
   });
 
   it("returns 500 when CRON_SECRET unset in production", () => {
-    process.env.NODE_ENV = "production";
-    delete process.env.CRON_SECRET;
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("CRON_SECRET", "");
     const res = assertCronAuthorized(new Request("http://t"));
     expect(res?.status).toBe(500);
   });
 
   it("accepts Bearer token", () => {
-    process.env.CRON_SECRET = "abc";
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("CRON_SECRET", "abc");
+    vi.stubEnv("NODE_ENV", "production");
     const res = assertCronAuthorized(
       new Request("http://t", {
         headers: { Authorization: "Bearer abc" },
@@ -160,8 +158,8 @@ describe("assertCronAuthorized", () => {
   });
 
   it("accepts x-cron-secret header", () => {
-    process.env.CRON_SECRET = "secret";
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("CRON_SECRET", "secret");
+    vi.stubEnv("NODE_ENV", "production");
     const res = assertCronAuthorized(
       new Request("http://t", {
         headers: { "x-cron-secret": "secret" },
@@ -172,25 +170,38 @@ describe("assertCronAuthorized", () => {
 });
 
 describe("assertSensorsAuthorized", () => {
-  const prev = process.env.SENSORS_API_KEY;
-
-  afterEach(() => {
-    process.env.SENSORS_API_KEY = prev;
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
   });
 
-  it("allows when key not configured", () => {
-    delete process.env.SENSORS_API_KEY;
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("allows when key not configured in development", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("SENSORS_API_KEY", "");
     expect(assertSensorsAuthorized(new Request("http://t"))).toBeNull();
   });
 
+  it("returns 500 when key not configured in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SENSORS_API_KEY", "");
+    const res = assertSensorsAuthorized(new Request("http://t"));
+    expect(res?.status).toBe(500);
+  });
+
   it("rejects without key when configured", () => {
-    process.env.SENSORS_API_KEY = "k";
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SENSORS_API_KEY", "k");
     const res = assertSensorsAuthorized(new Request("http://t"));
     expect(res?.status).toBe(401);
   });
 
   it("accepts x-api-key", () => {
-    process.env.SENSORS_API_KEY = "k";
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SENSORS_API_KEY", "k");
     const res = assertSensorsAuthorized(
       new Request("http://t", { headers: { "x-api-key": "k" } })
     );

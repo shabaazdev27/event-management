@@ -16,6 +16,8 @@ export default function TriviaManager() {
   const { venueId } = useVenue();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [, setSaving] = useState(false);
+  const [error, setError] = useState("");
   
   const [isAdding, setIsAdding] = useState(false);
   const [addForm, setAddForm] = useState({ 
@@ -23,6 +25,22 @@ export default function TriviaManager() {
     opt1: "", opt2: "", opt3: "", opt4: "", 
     answer: "" 
   });
+
+  const resetAddForm = () => {
+    setAddForm({ question: "", opt1: "", opt2: "", opt3: "", opt4: "", answer: "" });
+  };
+
+  const handleToggleAdd = () => {
+    if (isAdding) {
+      resetAddForm();
+      setError("");
+      setIsAdding(false);
+      return;
+    }
+    resetAddForm();
+    setError("");
+    setIsAdding(true);
+  };
 
   useEffect(() => {
     const triviaRef = venuePaths.trivia(venueId);
@@ -61,16 +79,31 @@ export default function TriviaManager() {
     };
 
     const updated = [...questions, newQ];
-    await handleSave(updated);
-    
-    setIsAdding(false);
-    setAddForm({ question: "", opt1: "", opt2: "", opt3: "", opt4: "", answer: "" });
+    try {
+      setError("");
+      setIsAdding(false);
+      resetAddForm();
+      setSaving(true);
+      await handleSave(updated);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save question.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (idx: number) => {
     if (!confirm("Are you sure you want to remove this question?")) return;
     const updated = questions.filter((_, i) => i !== idx);
-    await handleSave(updated);
+    try {
+      setError("");
+      setSaving(true);
+      await handleSave(updated);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to remove question.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <div className="text-sm text-neutral-400">Loading Trivia Manager...</div>;
@@ -83,13 +116,19 @@ export default function TriviaManager() {
           <h2 className="font-semibold">Manage Fan Trivia</h2>
         </div>
         <button 
-          onClick={() => setIsAdding(!isAdding)}
+          onClick={handleToggleAdd}
           className="flex items-center gap-1 text-xs font-semibold bg-yellow-500/20 px-3 py-1.5 rounded-lg border border-yellow-500/20 hover:bg-yellow-500/30 transition-colors"
         >
           {isAdding ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {isAdding ? "Cancel" : "Add Question"}
         </button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-xl bg-rose-500/20 border border-rose-500/20 text-rose-400 text-sm">
+          {error}
+        </div>
+      )}
 
       {isAdding && (
         <form onSubmit={handleAdd} className="mb-6 p-4 bg-neutral-800/40 rounded-xl border border-white/5 space-y-4">
@@ -138,7 +177,7 @@ export default function TriviaManager() {
         
         {questions.map((q, idx) => (
           <div key={idx} className="p-4 rounded-xl bg-neutral-800/40 border border-white/5 relative group">
-             <button onClick={() => handleDelete(idx)} className="absolute top-4 right-4 p-1.5 text-rose-400/50 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-900 rounded-lg">
+             <button onClick={() => handleDelete(idx)} className="absolute top-4 right-4 p-1.5 text-rose-400/80 hover:text-rose-300 bg-neutral-900 rounded-lg border border-rose-500/20 transition-colors">
                <Trash2 className="w-4 h-4" />
              </button>
              <h3 className="text-sm font-medium text-white mb-2 pr-8">{q.question}</h3>

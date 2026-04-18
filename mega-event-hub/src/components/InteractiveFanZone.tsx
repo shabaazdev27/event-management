@@ -23,7 +23,10 @@ function InteractiveFanZoneInner({ venueId }: { venueId: string }) {
 
   useEffect(() => {
     const pollRef = venuePaths.fanpoll(venueId);
-    const unsubscribe = onSnapshot(pollRef, (snap) => {
+    const unsubscribe = onSnapshot(
+      pollRef,
+      { includeMetadataChanges: true },
+      (snap) => {
       if (!snap.exists()) {
         const defaultPoll: FanPollDoc = {
           question: "Which encore song should the headliner play?",
@@ -71,7 +74,7 @@ function InteractiveFanZoneInner({ venueId }: { venueId: string }) {
 
   return (
     <section
-      className="bg-gradient-to-br from-indigo-900/40 to-purple-900/20 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden w-full shrink-0 isolate"
+      className="bg-linear-to-br from-indigo-900/40 to-purple-900/20 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden w-full shrink-0 isolate"
       aria-labelledby="fan-zone-heading"
     >
       <div className="absolute top-0 right-0 p-4 opacity-10" aria-hidden>

@@ -9,6 +9,7 @@ export type VenueDefinition = {
   timezone: string;
   defaultCapacity: number;
   parkingSummary: string;
+  eventManagementHelpline: string;
 };
 
 /** Shipped defaults; copied into Firestore `venue_catalog` when the collection is empty. */
@@ -24,6 +25,7 @@ export const SEED_VENUES: Record<string, VenueDefinition> = {
     timezone: "Asia/Kolkata",
     defaultCapacity: 50000,
     parkingSummary: "Lots A, B, North plaza",
+    eventManagementHelpline: "1800-200-1122",
   },
   bangalore: {
     id: "bangalore",
@@ -36,6 +38,7 @@ export const SEED_VENUES: Record<string, VenueDefinition> = {
     timezone: "Asia/Kolkata",
     defaultCapacity: 40000,
     parkingSummary: "MG Road & Cubbon Park zones",
+    eventManagementHelpline: "1800-200-1133",
   },
   mumbai: {
     id: "mumbai",
@@ -48,6 +51,7 @@ export const SEED_VENUES: Record<string, VenueDefinition> = {
     timezone: "Asia/Kolkata",
     defaultCapacity: 33000,
     parkingSummary: "Marine Lines & Churchgate",
+    eventManagementHelpline: "1800-200-1144",
   },
 };
 

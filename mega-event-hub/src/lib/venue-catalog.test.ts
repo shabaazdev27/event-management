@@ -41,7 +41,18 @@ describe("normalizeVenueFromFirestore", () => {
       timezone: "Asia/Kolkata",
       defaultCapacity: 600,
       parkingSummary: "See venue parking map",
+      eventManagementHelpline: "1800-200-1122",
     });
+  });
+
+  it("normalizes venue-specific helpline when provided", () => {
+    const v = normalizeVenueFromFirestore("hub", {
+      name: "Main Arena",
+      lat: 12.5,
+      lon: -3.25,
+      eventManagementHelpline: "1800-999-1234",
+    });
+    expect(v?.eventManagementHelpline).toBe("1800-999-1234");
   });
 
   it("clamps defaultCapacity below 500 to 50000", () => {

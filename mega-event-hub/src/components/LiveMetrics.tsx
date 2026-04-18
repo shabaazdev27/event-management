@@ -12,6 +12,8 @@ type StaffMetrics = {
   trend: string;
 };
 
+type StaffMetricOverrides = Partial<StaffMetrics>;
+
 type GateWaitRow = { wait_time?: number };
 
 export default function LiveMetrics() {
@@ -60,22 +62,67 @@ export default function LiveMetrics() {
     return () => unsubscribe();
   }, [venueId]);
 
+  useEffect(() => {
+    const unsubscribe = onSnapshot(venuePaths.staffMetricOverrides(venueId), (docSnap) => {
+      if (!docSnap || typeof (docSnap as { exists?: unknown }).exists !== "function") {
+        return;
+      }
+      if (!docSnap.exists()) return;
+      const data = docSnap.data() as StaffMetricOverrides;
+
+      setMetrics((prev) => ({
+        ...prev,
+        totalInside:
+          typeof data.totalInside === "number" ? data.totalInside : prev.totalInside,
+        highDensityZones:
+          typeof data.highDensityZones === "number"
+            ? data.highDensityZones
+            : prev.highDensityZones,
+        trend: typeof data.trend === "string" ? data.trend : prev.trend,
+      }));
+    });
+
+    return () => unsubscribe();
+  }, [venueId]);
+
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<StaffMetrics>(metrics);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const toggleEditing = () => {
     if (isEditing) {
+      setEditForm(metrics);
+      setError("");
       setIsEditing(false);
     } else {
       setEditForm(metrics);
+      setError("");
       setIsEditing(true);
     }
   };
 
   const handleSaveMetrics = async (e: React.FormEvent) => {
     e.preventDefault();
-    await setDoc(venuePaths.staffMetricOverrides(venueId), editForm, { merge: true });
+    if (saving) return;
+    setError("");
+    setSaving(true);
+    const nextMetrics = { ...editForm };
+    setMetrics(nextMetrics);
     setIsEditing(false);
+    try {
+      await Promise.race([
+        setDoc(venuePaths.staffMetricOverrides(venueId), nextMetrics, { merge: true }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Save timed out. Please try again.")), 8000)
+        ),
+      ]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save metrics.");
+      setIsEditing(true);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -92,6 +139,8 @@ export default function LiveMetrics() {
           {isEditing ? "Cancel" : "Edit Metrics"}
         </button>
       </div>
+
+      {error && <p className="text-sm text-rose-400">{error}</p>}
 
       {isEditing ? (
         <form
@@ -151,6 +200,7 @@ export default function LiveMetrics() {
           </p>
           <button
             type="submit"
+            disabled={saving}
             className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
           >
             Save Details

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { onSnapshot, query } from "firebase/firestore";
+import { onSnapshot, query, limit } from "firebase/firestore";
 import { venuePaths } from "@/lib/venue-firestore-paths";
 import { useVenue } from "@/context/VenueContext";
-import { Video, Camera, Car } from "lucide-react";
+import { Video, Camera, Car, Loader2 } from "lucide-react";
 
 type Feed = {
   id?: string;
@@ -18,21 +18,59 @@ type Feed = {
 export default function LiveFeeds({ title = "Live Gate Feeds", collectionName = "cameras", iconType = "video" }: { title?: string, collectionName?: string, iconType?: "video" | "car" }) {
   const { venueId } = useVenue();
   const [feeds, setFeeds] = useState<Feed[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // State reset before wiring a new subscription is intentional for venue/collection switches.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setError(null);
+    let hasResolved = false;
+    
+    // Add timeout for slow queries
+    const queryTimeout = setTimeout(() => {
+      if (!hasResolved) {
+        setError("Loading feeds is taking longer than expected...");
+      }
+    }, 3000);
+
     const col =
       collectionName === "parking_cameras"
         ? venuePaths.parkingCameras(venueId)
         : venuePaths.cameras(venueId);
-    const q = query(col);
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        setFeeds(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Feed)));
-      } else {
-        setFeeds([]);
+    
+    // Limit feeds to 10 for better performance
+    const q = query(col, limit(10));
+    
+    const unsubscribe = onSnapshot(
+      q,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        hasResolved = true;
+        clearTimeout(queryTimeout);
+        if (!snapshot.empty) {
+          setFeeds(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Feed)));
+        } else {
+          setFeeds([]);
+        }
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        hasResolved = true;
+        clearTimeout(queryTimeout);
+        console.error(`Error loading ${collectionName}:`, err);
+        setError("Failed to load feeds");
+        setLoading(false);
       }
-    });
-    return () => unsubscribe();
+    );
+    
+    return () => {
+      hasResolved = true;
+      clearTimeout(queryTimeout);
+      unsubscribe();
+    };
   }, [collectionName, venueId]);
 
   const isClient = useSyncExternalStore(
@@ -50,16 +88,35 @@ export default function LiveFeeds({ title = "Live Gate Feeds", collectionName = 
       <div className="flex items-center gap-2 mb-6">
         <Icon className="w-5 h-5 text-rose-400" aria-hidden />
         <h2 id={`live-feeds-${collectionName}`} className="font-semibold text-lg">{title}</h2>
+        {loading && (
+          <Loader2 className="w-4 h-4 text-neutral-500 animate-spin ml-auto" aria-label="Loading feeds" />
+        )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {feeds.map(feed => <FeedCard key={feed.id || feed.location} feed={feed} />)}
-      </div>
-      
-      {feeds.length === 0 && (
-         <div className="text-center p-8 text-neutral-500 italic border border-dashed border-white/10 rounded-xl">
-           No active feeds published.
-         </div>
+      {error && (
+        <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      {loading && feeds.length === 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="aspect-video bg-neutral-800/40 rounded-xl animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {feeds.map(feed => <FeedCard key={feed.id || feed.location} feed={feed} />)}
+          </div>
+          
+          {feeds.length === 0 && !loading && (
+            <div className="text-center p-8 text-neutral-500 italic border border-dashed border-white/10 rounded-xl">
+              No active feeds published.
+            </div>
+          )}
+        </>
       )}
     </section>
   );
@@ -78,12 +135,14 @@ function FeedCard({ feed }: { feed: Feed }) {
     if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
+    return (match && match[2] && match[2].length === 11) ? match[2] : null;
   };
 
   const isImage = (url: string) => {
     if (!url) return false;
-    const cleanUrl = url.split('?')[0].toLowerCase();
+    const parts = url.split('?');
+    const cleanUrl = parts[0]?.toLowerCase();
+    if (!cleanUrl) return false;
     return cleanUrl.match(/\.(jpeg|jpg|gif|png|webp)$/) != null;
   };
 
@@ -101,6 +160,7 @@ function FeedCard({ feed }: { feed: Feed }) {
             title={`Live video: ${feed.location}`}
           />
         ) : isImg ? (
+           // eslint-disable-next-line @next/next/no-img-element
           <img src={feed.videoUrl} alt={`Camera feed: ${feed.location}`} className="absolute inset-0 w-full h-full object-cover opacity-80" />
         ) : feed.videoUrl ? (
           <video src={feed.videoUrl} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-80" />

@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { addNewGate } from "@/lib/venue-core";
 import { resolveVenueIdFromRequest } from "@/lib/venue-resolve";
 import {
@@ -9,6 +8,7 @@ import {
   validateLocation,
   validateMaxFlow,
 } from "@/lib/api-validation";
+import { createErrorResponse, createSuccessResponse } from "@/lib/security";
 
 export async function POST(request: Request) {
   const auth = assertSensorsAuthorized(request);
@@ -25,15 +25,15 @@ export async function POST(request: Request) {
     );
 
     await addNewGate(id, max_flow, location, venueId);
-    return NextResponse.json({
+    return createSuccessResponse({
       success: true,
       message: `Gate ${id} added successfully.`,
     });
   } catch (err: unknown) {
     if (err instanceof ApiValidationError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      return createErrorResponse(err.message, err.status);
     }
     const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return createErrorResponse(message, 500);
   }
 }

@@ -8,22 +8,21 @@ vi.mock("@/lib/venue-core", () => ({
 import { processScheduledCalculations } from "@/lib/venue-core";
 
 describe("/api/cron/process", () => {
-  const prevEnv = { ...process.env };
-
   beforeEach(() => {
     vi.mocked(processScheduledCalculations).mockClear();
-    process.env = { ...prevEnv };
-    process.env.NODE_ENV = "development";
-    delete process.env.CRON_SECRET;
+    vi.unstubAllEnvs();
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("CRON_SECRET", "");
   });
 
   afterEach(() => {
-    process.env = prevEnv;
+    vi.unstubAllEnvs();
   });
 
   it("GET runs calculations when cron auth passes in development", async () => {
     const res = await GET(new Request("http://localhost/api/cron/process"));
     expect(res.status).toBe(200);
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
     expect(processScheduledCalculations).toHaveBeenCalledTimes(1);
   });
 
@@ -34,10 +33,11 @@ describe("/api/cron/process", () => {
   });
 
   it("returns 500 in production when CRON_SECRET unset", async () => {
-    process.env.NODE_ENV = "production";
-    delete process.env.CRON_SECRET;
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("CRON_SECRET", "");
     const res = await GET(new Request("http://localhost/api/cron/process"));
     expect(res.status).toBe(500);
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(processScheduledCalculations).not.toHaveBeenCalled();
   });
 });

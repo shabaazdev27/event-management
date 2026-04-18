@@ -12,7 +12,7 @@ export default function VenuesOverviewPage() {
       <header className="sticky top-0 z-40 bg-neutral-900/90 backdrop-blur-md border-b border-white/10">
         <div className="w-full max-w-screen-2xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <LayoutGrid className="w-6 h-6 text-indigo-400 flex-shrink-0" />
+            <LayoutGrid className="w-6 h-6 text-indigo-400 shrink-0" />
             <div className="min-w-0">
               <h1 className="font-semibold text-lg tracking-tight truncate">
                 Venue dashboards

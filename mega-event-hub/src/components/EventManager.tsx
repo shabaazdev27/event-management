@@ -27,12 +27,25 @@ export default function EventManager() {
   const [events, setEvents] = useState<EventDoc[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", type: "", date: "" });
+  const [error, setError] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: "", type: "", date: "" });
 
   const [managingScheduleId, setManagingScheduleId] = useState<string | null>(null);
   const [newScheduleItem, setNewScheduleItem] = useState({ time: "", title: "", desc: "", status: "upcoming" as "upcoming" | "active" | "done" });
+
+  const handleToggleAdd = () => {
+    if (isAdding) {
+      setAddForm({ name: "", type: "", date: "" });
+      setError("");
+      setIsAdding(false);
+      return;
+    }
+    setAddForm({ name: "", type: "", date: "" });
+    setError("");
+    setIsAdding(true);
+  };
 
   useEffect(() => {
     const eventsCol = venuePaths.events(venueId);
@@ -67,33 +80,51 @@ export default function EventManager() {
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.name) return;
-    await addDoc(venuePaths.events(venueId), {
-      ...addForm,
-      schedule: [],
-    });
-    setIsAdding(false);
-    setAddForm({ name: "", type: "", date: "" });
+    const previousForm = { ...addForm };
+    try {
+      setError("");
+      setIsAdding(false);
+      setAddForm({ name: "", type: "", date: "" });
+      await addDoc(venuePaths.events(venueId), {
+        ...previousForm,
+        schedule: [],
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create event.");
+      setAddForm(previousForm);
+      setIsAdding(true);
+    }
   };
 
   const handleUpdateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) return;
-    await updateDoc(venuePaths.eventDoc(venueId, editingId), {
-      name: editForm.name,
-      type: editForm.type,
-      date: editForm.date,
-    });
-    setEditingId(null);
+    try {
+      setError("");
+      await updateDoc(venuePaths.eventDoc(venueId, editingId), {
+        name: editForm.name,
+        type: editForm.type,
+        date: editForm.date,
+      });
+      setEditingId(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update event.");
+    }
   };
 
   const handleDeleteEvent = async (id: string) => {
     if (confirm("Delete this event completely?")) {
-      await deleteDoc(venuePaths.eventDoc(venueId, id));
+      try {
+        await deleteDoc(venuePaths.eventDoc(venueId, id));
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to delete event.");
+      }
     }
   };
 
   const handleAddScheduleItem = async (eventId: string, currentSchedule: ScheduleItem[]) => {
     if (!newScheduleItem.time || !newScheduleItem.title) return;
+    const previousItem = { ...newScheduleItem };
     const item = {
       time: newScheduleItem.time,
       title: newScheduleItem.title,
@@ -105,15 +136,29 @@ export default function EventManager() {
     // Auto sort by time could be done here, for now just push
     const updated = [...currentSchedule, item].sort((a,b) => a.time.localeCompare(b.time));
 
-    await updateDoc(venuePaths.eventDoc(venueId, eventId), {
-      schedule: updated,
-    });
-    setNewScheduleItem({ time: "", title: "", desc: "", status: "upcoming" });
+    try {
+      setError("");
+      setNewScheduleItem({ time: "", title: "", desc: "", status: "upcoming" });
+      setManagingScheduleId(null);
+      await updateDoc(venuePaths.eventDoc(venueId, eventId), {
+        schedule: updated,
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to add schedule item.");
+      setNewScheduleItem(previousItem);
+      setManagingScheduleId(eventId);
+    }
   };
 
   const handleRemoveScheduleItem = async (eventId: string, currentSchedule: ScheduleItem[], idxToRemove: number) => {
     const updated = currentSchedule.filter((_, i) => i !== idxToRemove);
-    await updateDoc(venuePaths.eventDoc(venueId, eventId), { schedule: updated });
+    try {
+      setError("");
+      await updateDoc(venuePaths.eventDoc(venueId, eventId), { schedule: updated });
+      setManagingScheduleId(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to remove schedule item.");
+    }
   };
 
   return (
@@ -124,7 +169,7 @@ export default function EventManager() {
           <h2 className="font-semibold">Manage Events & Schedules</h2>
         </div>
         <button 
-          onClick={() => setIsAdding(!isAdding)}
+          onClick={handleToggleAdd}
           className="flex items-center gap-1 text-xs font-semibold bg-indigo-500/20 px-3 py-1.5 rounded-lg border border-indigo-500/20 hover:bg-indigo-500/30 transition-colors"
         >
           {isAdding ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -132,9 +177,15 @@ export default function EventManager() {
         </button>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 rounded-xl bg-rose-500/20 border border-rose-500/20 text-rose-400 text-sm">
+          {error}
+        </div>
+      )}
+
       {isAdding && (
         <form onSubmit={handleAddEvent} className="mb-6 p-4 bg-neutral-800/40 rounded-xl border border-white/5 flex flex-wrap gap-4 items-end">
-          <div className="flex-1 min-w-[150px]">
+          <div className="flex-1 min-w-37.5">
              <label className="text-xs text-neutral-400 mb-1 block">Event Name</label>
              <input type="text" required className="w-full bg-neutral-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white" value={addForm.name} onChange={e => setAddForm({...addForm, name: e.target.value})} />
           </div>

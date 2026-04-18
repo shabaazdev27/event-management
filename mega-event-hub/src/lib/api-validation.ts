@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createErrorResponse } from "@/lib/security";
 
 /** Max JSON body size for API routes (bytes). */
 export const MAX_JSON_BODY_BYTES = 48_000;
@@ -122,10 +123,7 @@ export function assertCronAuthorized(request: Request): NextResponse | null {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { error: "Server configuration error." },
-        { status: 500 }
-      );
+      return createErrorResponse("Server configuration error.", 500);
     }
     return null;
   }
@@ -135,18 +133,24 @@ export function assertCronAuthorized(request: Request): NextResponse | null {
   const header = request.headers.get("x-cron-secret")?.trim();
   const token = bearer || header;
   if (!token || token !== secret) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    return createErrorResponse("Unauthorized.", 401);
   }
   return null;
 }
 
 /**
- * Optional shared secret for sensor and gate management POST endpoints.
- * When SENSORS_API_KEY is set, requests must send Authorization: Bearer <key> or x-api-key.
+ * Shared secret for sensor and gate management POST endpoints.
+ * In production, SENSORS_API_KEY is required and requests must send
+ * Authorization: Bearer <key> or x-api-key.
  */
 export function assertSensorsAuthorized(request: Request): NextResponse | null {
   const key = process.env.SENSORS_API_KEY?.trim();
-  if (!key) return null;
+  if (!key) {
+    if (process.env.NODE_ENV === "production") {
+      return createErrorResponse("Server configuration error.", 500);
+    }
+    return null;
+  }
 
   const auth = request.headers.get("authorization");
   const bearer =
@@ -154,7 +158,7 @@ export function assertSensorsAuthorized(request: Request): NextResponse | null {
   const apiKey = request.headers.get("x-api-key")?.trim();
   const token = bearer || apiKey;
   if (!token || token !== key) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    return createErrorResponse("Unauthorized.", 401);
   }
   return null;
 }

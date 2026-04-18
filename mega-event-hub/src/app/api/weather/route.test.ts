@@ -20,6 +20,7 @@ describe("GET /api/weather", () => {
   it("returns 400 when lat/lon missing", async () => {
     const res = await GET(req(null, null));
     expect(res.status).toBe(400);
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
   });
 
   it("returns 400 when coordinates out of range", async () => {
@@ -27,14 +28,18 @@ describe("GET /api/weather", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 502 when provider responds not ok", async () => {
+  it("returns fallback data when provider responds not ok", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 503,
     }) as unknown as typeof fetch;
 
     const res = await GET(req("40.7", "-74"));
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.isFallback).toBe(true);
+    expect(body.tempC).toBe(20);
+    expect(body.condition).toBe("Clear");
   });
 
   it("returns JSON with temps and condition on success", async () => {
@@ -52,6 +57,7 @@ describe("GET /api/weather", () => {
 
     const res = await GET(req("40", "-74"));
     expect(res.status).toBe(200);
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.tempC).toBe(20.5);
     expect(body.condition).toBe("Clear skies");
@@ -60,13 +66,17 @@ describe("GET /api/weather", () => {
     expect(body.weatherCode).toBe(0);
   });
 
-  it("returns 502 when temperature missing in payload", async () => {
+  it("returns fallback data when temperature missing in payload", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ current: { weather_code: 1 } }),
     }) as unknown as typeof fetch;
 
     const res = await GET(req("1", "1"));
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.isFallback).toBe(true);
+    expect(body.tempC).toBe(20);
   });
 });

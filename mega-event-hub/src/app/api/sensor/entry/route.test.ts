@@ -29,6 +29,7 @@ describe("POST /api/sensor/entry", () => {
     process.env.SENSORS_API_KEY = "k";
     const res = await POST(post({ gateId: "G1" }));
     expect(res.status).toBe(401);
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
   });
 
   it("processes entry when authorized", async () => {
@@ -37,11 +38,13 @@ describe("POST /api/sensor/entry", () => {
       post({ gateId: "North-1", venueId: "x" }, { Authorization: "Bearer k" })
     );
     expect(res.status).toBe(200);
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(handleSensorEntry).toHaveBeenCalledWith("North-1", "chennai");
   });
 
   it("returns 400 for invalid gate id", async () => {
     const res = await POST(post({ gateId: "../bad" }));
     expect(res.status).toBe(400);
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
   });
 });

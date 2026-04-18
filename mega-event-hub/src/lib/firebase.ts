@@ -1,5 +1,12 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import {
+  getFirestore,
+  type Firestore,
+  enableIndexedDbPersistence,
+  enableMultiTabIndexedDbPersistence,
+  CACHE_SIZE_UNLIMITED,
+  initializeFirestore,
+} from "firebase/firestore";
 
 /**
  * Client Firebase config: public keys only (safe in the browser).
@@ -36,4 +43,63 @@ function createApp(): FirebaseApp {
 }
 
 export const app = createApp();
-export const db: Firestore = getFirestore(app);
+
+/**
+ * Initialize Firestore with optimized settings for faster loading
+ */
+let firestoreInstance: Firestore | null = null;
+
+function initializeOptimizedFirestore(): Firestore {
+  if (firestoreInstance) return firestoreInstance;
+
+  try {
+    // Initialize with cache optimization
+    firestoreInstance = initializeFirestore(app, {
+      cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+      ignoreUndefinedProperties: true,
+    });
+
+    // Enable offline persistence for instant loading from cache
+    if (typeof window !== "undefined") {
+      enableMultiTabIndexedDbPersistence(firestoreInstance).catch((err) => {
+        if (err.code === "failed-precondition") {
+          // Multiple tabs open, fallback to single tab
+          enableIndexedDbPersistence(firestoreInstance!).catch(() => {
+            console.warn("[firebase] Persistence disabled");
+          });
+        } else if (err.code === "unimplemented") {
+          console.warn("[firebase] Persistence not available in this browser");
+        }
+      });
+    }
+
+    return firestoreInstance;
+  } catch {
+    // Fallback if initialization fails
+    return getFirestore(app);
+  }
+}
+
+export const db: Firestore = initializeOptimizedFirestore();
+
+/**
+ * Connection state for UI feedback
+ */
+export const connectionState = {
+  isConnected: true,
+  listeners: new Set<(connected: boolean) => void>(),
+  
+  subscribe(callback: (connected: boolean) => void) {
+    this.listeners.add(callback);
+    return () => {
+      this.listeners.delete(callback);
+    };
+  },
+  
+  setConnected(connected: boolean) {
+    if (this.isConnected !== connected) {
+      this.isConnected = connected;
+      this.listeners.forEach(cb => cb(connected));
+    }
+  },
+};

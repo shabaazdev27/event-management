@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, ChevronDown } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { useVenue } from "@/context/VenueContext";
 
 type Props = {
@@ -20,13 +20,13 @@ export default function VenueSelector({ variant = "guest", className = "" }: Pro
       className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 min-w-0 ${border} ${className}`}
     >
       <MapPin
-        className={`w-4 h-4 flex-shrink-0 ${variant === "staff" ? "text-rose-300" : "text-indigo-400"}`}
+        className={`w-4 h-4 shrink-0 ${variant === "staff" ? "text-rose-300" : "text-indigo-400"}`}
       />
       <select
         aria-label="Select venue"
         value={venueId}
         onChange={(e) => setVenueId(e.target.value)}
-        className="bg-transparent text-xs sm:text-sm text-white font-medium truncate cursor-pointer focus:outline-none focus:ring-0 min-w-0 flex-1 max-w-[200px] sm:max-w-[280px]"
+        className="bg-transparent text-xs sm:text-sm text-white font-medium truncate cursor-pointer focus:outline-none focus:ring-0 min-w-0 flex-1 max-w-50 sm:max-w-70"
       >
         {venueList.map((v) => (
           <option key={v.id} value={v.id} className="bg-neutral-900 text-white">

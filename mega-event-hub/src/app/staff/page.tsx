@@ -22,7 +22,7 @@ export default function StaffDashboard() {
       <header className="sticky top-0 z-40 bg-neutral-900/80 backdrop-blur-md border-b border-rose-500/20">
         <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-5 md:px-6 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-rose-500 to-orange-600 flex items-center justify-center shrink-0">
               <Activity className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0">
@@ -44,7 +44,7 @@ export default function StaffDashboard() {
               <GuestEventLink className="text-xs sm:text-sm font-medium text-neutral-400 hover:text-rose-400 transition-colors whitespace-nowrap">
                 Guest event
               </GuestEventLink>
-              <div className="px-2.5 py-1 bg-rose-500/20 text-rose-400 rounded-full text-[10px] sm:text-xs font-semibold border border-rose-500/20 flex items-center gap-2 flex-shrink-0">
+              <div className="px-2.5 py-1 bg-rose-500/20 text-rose-400 rounded-full text-[10px] sm:text-xs font-semibold border border-rose-500/20 flex items-center gap-2 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
                 Live
               </div>

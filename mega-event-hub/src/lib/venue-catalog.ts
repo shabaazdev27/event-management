@@ -32,6 +32,9 @@ export function normalizeVenueFromFirestore(
   const parkingSummary =
     String(data.parkingSummary ?? "See venue parking map").trim() ||
     "See venue parking map";
+  const eventManagementHelpline =
+    String(data.eventManagementHelpline ?? "1800-200-1122").trim() ||
+    "1800-200-1122";
 
   return {
     id,
@@ -44,6 +47,7 @@ export function normalizeVenueFromFirestore(
     timezone,
     defaultCapacity,
     parkingSummary,
+    eventManagementHelpline,
   };
 }
 

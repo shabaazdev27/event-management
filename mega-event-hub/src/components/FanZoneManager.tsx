@@ -20,6 +20,8 @@ export default function FanZoneManager() {
 function FanZoneManagerInner({ venueId }: { venueId: string }) {
   const [poll, setPoll] = useState<FanPollDoc | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const [question, setQuestion] = useState("");
   const [optionsStr, setOptionsStr] = useState("");
@@ -40,6 +42,7 @@ function FanZoneManagerInner({ venueId }: { venueId: string }) {
   }, [venueId]);
 
   const handleUpdate = async () => {
+    if (saving) return;
     const opts = optionsStr
       .split(",")
       .map((s) => s.trim())
@@ -54,20 +57,27 @@ function FanZoneManagerInner({ venueId }: { venueId: string }) {
       total += v;
     }
 
-    await setDoc(
-      venuePaths.fanpoll(venueId),
-      {
-        question,
-        options: optionsObj,
-        totalVotes: total,
-      },
-      { merge: true }
-    );
-
-    alert("Poll updated successfully!");
+    try {
+      setError("");
+      setSaving(true);
+      await setDoc(
+        venuePaths.fanpoll(venueId),
+        {
+          question,
+          options: optionsObj,
+          totalVotes: total,
+        },
+        { merge: true }
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save poll.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleReset = async () => {
+    if (saving) return;
     if (!confirm("Are you sure you want to reset all votes to 0?")) return;
 
     const opts = optionsStr
@@ -79,11 +89,19 @@ function FanZoneManagerInner({ venueId }: { venueId: string }) {
       optionsObj[opt] = 0;
     });
 
-    await setDoc(venuePaths.fanpoll(venueId), {
-      question,
-      options: optionsObj,
-      totalVotes: 0,
-    });
+    try {
+      setError("");
+      setSaving(true);
+      await setDoc(venuePaths.fanpoll(venueId), {
+        question,
+        options: optionsObj,
+        totalVotes: 0,
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to reset votes.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading)
@@ -99,6 +117,7 @@ function FanZoneManagerInner({ venueId }: { venueId: string }) {
       </div>
 
       <div className="space-y-4">
+        {error && <p className="text-sm text-rose-400">{error}</p>}
         <div>
           <label className="text-xs text-neutral-400 mb-1 block" htmlFor="fan-poll-question">
             Poll Question
@@ -129,7 +148,8 @@ function FanZoneManagerInner({ venueId }: { venueId: string }) {
           <button
             type="button"
             onClick={handleUpdate}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            disabled={saving}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             <Save className="w-4 h-4" aria-hidden /> Save Poll
           </button>
@@ -137,7 +157,8 @@ function FanZoneManagerInner({ venueId }: { venueId: string }) {
           <button
             type="button"
             onClick={handleReset}
-            className="flex items-center gap-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 px-4 py-2 rounded-lg text-sm font-medium border border-rose-500/20 transition-colors"
+            disabled={saving}
+            className="flex items-center gap-2 bg-rose-500/20 hover:bg-rose-500/30 disabled:opacity-60 text-rose-400 px-4 py-2 rounded-lg text-sm font-medium border border-rose-500/20 transition-colors"
           >
             <RefreshCw className="w-4 h-4" aria-hidden /> Reset Votes
           </button>

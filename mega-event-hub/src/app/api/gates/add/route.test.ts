@@ -36,6 +36,7 @@ describe("POST /api/gates/add", () => {
       post({ id: "G1", max_flow: 10, location: "GENERAL" })
     );
     expect(res.status).toBe(401);
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
     expect(addNewGate).not.toHaveBeenCalled();
   });
 
@@ -48,6 +49,7 @@ describe("POST /api/gates/add", () => {
       )
     );
     expect(res.status).toBe(200);
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     const json = (await res.json()) as { success?: boolean };
     expect(json.success).toBe(true);
     expect(addNewGate).toHaveBeenCalledWith(
@@ -62,5 +64,6 @@ describe("POST /api/gates/add", () => {
   it("returns 400 for ApiValidationError", async () => {
     const res = await POST(post({ id: "", max_flow: 1, location: "GENERAL" }));
     expect(res.status).toBe(400);
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
   });
 });

@@ -29,6 +29,7 @@ describe("POST /api/sensor/exit", () => {
     process.env.SENSORS_API_KEY = "secret";
     const res = await POST(post({ gateId: "G1" }));
     expect(res.status).toBe(401);
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
   });
 
   it("processes exit when authorized", async () => {
@@ -37,6 +38,7 @@ describe("POST /api/sensor/exit", () => {
       post({ gateId: "Exit-A" }, { "x-api-key": "k" })
     );
     expect(res.status).toBe(200);
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(handleSensorExit).toHaveBeenCalledWith("Exit-A", "mumbai");
   });
 });

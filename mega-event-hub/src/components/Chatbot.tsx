@@ -1,7 +1,7 @@
 "use client";
 
 import { Send, Bot, Sparkles, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useVenue } from "@/context/VenueContext";
 
 export default function Chatbot() {
@@ -9,6 +9,12 @@ export default function Chatbot() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => {
     setMessages([
@@ -18,28 +24,61 @@ export default function Chatbot() {
       },
     ]);
     setInput("");
+
+    // Log chatbot initialization (client-side metric)
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "chatbot_init", {
+        venue_id: venue.id,
+        venue_name: venue.name,
+      });
+    }
   }, [venue.id, venue.name, venue.city]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
     
     const userMsg = input;
+    const startTime = Date.now();
     setInput("");
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setLoading(true);
 
+    // Track message sent (client-side analytics)
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "chatbot_message_sent", {
+        venue_id: venue.id,
+        message_length: userMsg.length,
+      });
+    }
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-Venue-ID": venue.id,
+        },
         body: JSON.stringify({
           message: userMsg,
           venueName: venue.name,
           venueCity: venue.city,
         })
       });
+
+      const responseTime = Date.now() - startTime;
+      
       const data = (await res.json()) as { reply?: string; error?: string };
+      
       if (!res.ok) {
+        // Track error
+        if (typeof window !== "undefined" && window.gtag) {
+          window.gtag("event", "chatbot_error", {
+            venue_id: venue.id,
+            error_type: data.error || "unknown",
+            response_time: responseTime,
+          });
+        }
+
         setMessages((prev) => [
           ...prev,
           {
@@ -49,6 +88,16 @@ export default function Chatbot() {
         ]);
         return;
       }
+
+      // Track successful response
+      if (typeof window !== "undefined" && window.gtag) {
+        window.gtag("event", "chatbot_response_received", {
+          venue_id: venue.id,
+          response_time: responseTime,
+          reply_length: data.reply?.length || 0,
+        });
+      }
+
       setMessages((prev) => [
         ...prev,
         {
@@ -57,6 +106,13 @@ export default function Chatbot() {
         },
       ]);
     } catch {
+      // Track network error
+      if (typeof window !== "undefined" && window.gtag) {
+        window.gtag("event", "chatbot_network_error", {
+          venue_id: venue.id,
+        });
+      }
+      
       setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I'm having trouble connecting right now." }]);
     } finally {
       setLoading(false);
@@ -71,16 +127,19 @@ export default function Chatbot() {
       aria-label={`Assistant chat for ${venue.name}`}
     >
       <div
-        className="flex-grow p-4 overflow-y-auto space-y-4"
+        className="grow p-4 overflow-y-auto space-y-4"
         role="log"
         aria-live="polite"
         aria-relevant="additions"
         aria-busy={loading}
+        aria-label={`Chat messages with ${venue.name} assistant`}
       >
         {messages.map((msg, idx) => (
           <div
             key={idx}
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            role="article"
+            aria-label={`${msg.role === "user" ? "Your" : "Assistant"} message`}
           >
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-2 ${msg.role === "user" ? "bg-indigo-600/80 text-white" : "bg-neutral-800 text-neutral-200"}`}
@@ -90,7 +149,7 @@ export default function Chatbot() {
           </div>
         ))}
         {loading && (
-          <div className="flex justify-start" aria-hidden>
+          <div className="flex justify-start">
             <div className="bg-neutral-800 text-neutral-200 rounded-2xl px-4 py-2 flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-400" aria-hidden />
               <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" aria-hidden />
@@ -98,11 +157,12 @@ export default function Chatbot() {
             </div>
           </div>
         )}
+        <div ref={messagesEndRef} aria-hidden="true" />
       </div>
 
       <div className="p-3 bg-neutral-950/50 backdrop-blur-md border-t border-white/5">
         <div className="flex items-center gap-2 bg-neutral-900 border border-white/10 rounded-full px-4 py-2 focus-within:border-indigo-500/50 transition-colors">
-          <Bot className="w-5 h-5 text-indigo-400 flex-shrink-0" aria-hidden />
+          <Bot className="w-5 h-5 text-indigo-400 shrink-0" aria-hidden />
           <label htmlFor={inputId} className="sr-only">
             Message to assistant
           </label>
@@ -119,7 +179,7 @@ export default function Chatbot() {
             }}
             placeholder="Ask anything..."
             autoComplete="off"
-            className="flex-grow bg-transparent border-none outline-none text-sm px-2 text-white placeholder-neutral-500"
+            className="grow bg-transparent border-none outline-none text-sm px-2 text-white placeholder-neutral-500"
           />
           <button
             type="button"

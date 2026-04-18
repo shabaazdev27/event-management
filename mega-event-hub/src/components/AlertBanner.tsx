@@ -14,11 +14,21 @@ export default function AlertBanner({ staffMode = false }: { staffMode?: boolean
 
   useEffect(() => {
     const metricsRef = venuePaths.metricsDoc(venueId);
-    const unsubscribe = onSnapshot(metricsRef, (snap) => {
+    const unsubscribe = onSnapshot(
+      metricsRef,
+      { includeMetadataChanges: true },
+      (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (data.global_status?.alert_message) {
-          // You could tailor this or just use the system message
+          // Track alert shown (client-side analytics)
+          if (typeof window !== "undefined" && window.gtag) {
+            window.gtag("event", "alert_banner_shown", {
+              venue_id: venueId,
+              alert_type: staffMode ? "staff" : "guest",
+              message: data.global_status.alert_message,
+            });
+          }
           setMessages([data.global_status.alert_message]);
         } else {
           setMessages([]);
@@ -44,8 +54,8 @@ export default function AlertBanner({ staffMode = false }: { staffMode?: boolean
                 : 'bg-amber-500/20 border-amber-500/50 text-amber-100'
             }`}
           >
-            <AlertCircle className={`w-5 h-5 ${staffMode ? 'text-rose-400' : 'text-amber-400'}`} />
-            <p className="text-sm font-medium">{msg}</p>
+            <AlertCircle className={`w-5 h-5 ${staffMode ? 'text-rose-400' : 'text-amber-400'}`} aria-hidden="true" />
+            <p className="text-sm font-medium" role="alert" aria-live="assertive">{msg}</p>
           </motion.div>
         ))}
       </AnimatePresence>

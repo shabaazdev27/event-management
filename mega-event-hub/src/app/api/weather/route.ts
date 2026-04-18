@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { ApiValidationError, parseLatLon } from "@/lib/api-validation";
 import { labelForWeatherCode } from "@/lib/weather-codes";
+import { createErrorResponse, createSuccessResponse } from "@/lib/security";
 
 export async function GET(req: NextRequest) {
   const latRaw = req.nextUrl.searchParams.get("lat");
@@ -13,9 +14,9 @@ export async function GET(req: NextRequest) {
     ({ lat, lon } = parseLatLon(latRaw, lonRaw));
   } catch (e: unknown) {
     if (e instanceof ApiValidationError) {
-      return NextResponse.json({ error: e.message }, { status: e.status });
+      return createErrorResponse(e.message, e.status);
     }
-    return NextResponse.json({ error: "Invalid coordinates." }, { status: 400 });
+    return createErrorResponse("Invalid coordinates.", 400);
   }
 
   const url = new URL("https://api.open-meteo.com/v1/forecast");
@@ -27,13 +28,35 @@ export async function GET(req: NextRequest) {
   url.searchParams.set("forecast_days", "1");
 
   try {
-    const res = await fetch(url.toString(), { next: { revalidate: 600 } });
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+    const res = await fetch(url.toString(), { 
+      next: { revalidate: 600 },
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'ArenaLink/1.0'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+
     if (!res.ok) {
-      return NextResponse.json(
-        { error: "Weather provider returned an error." },
-        { status: 502 }
-      );
+      console.warn(`Weather API returned status ${res.status}`);
+      // Return fallback data instead of error
+      return createSuccessResponse({
+        tempC: 20,
+        tempF: 68,
+        condition: "Clear",
+        humidityPercent: 50,
+        rainChancePercent: 10,
+        weatherCode: 0,
+        isFallback: true
+      });
     }
+
     const data = (await res.json()) as {
       current?: {
         temperature_2m?: number;
@@ -42,6 +65,7 @@ export async function GET(req: NextRequest) {
       };
       daily?: { precipitation_probability_max?: number[] };
     };
+    
     const t = data.current?.temperature_2m;
     const code = data.current?.weather_code ?? 0;
     const humidity = data.current?.relative_humidity_2m;
@@ -50,16 +74,23 @@ export async function GET(req: NextRequest) {
       : null;
 
     if (typeof t !== "number") {
-      return NextResponse.json(
-        { error: "Unexpected weather response." },
-        { status: 502 }
-      );
+      console.warn("Weather API returned invalid temperature");
+      // Return fallback data
+      return createSuccessResponse({
+        tempC: 20,
+        tempF: 68,
+        condition: "Clear",
+        humidityPercent: 50,
+        rainChancePercent: 10,
+        weatherCode: 0,
+        isFallback: true
+      });
     }
 
     const tempC = Math.round(t * 10) / 10;
     const tempF = Math.round(((t * 9) / 5 + 32) * 10) / 10;
 
-    return NextResponse.json({
+    return createSuccessResponse({
       tempC,
       tempF,
       condition: labelForWeatherCode(code),
@@ -67,11 +98,25 @@ export async function GET(req: NextRequest) {
       rainChancePercent:
         typeof rainPct === "number" ? Math.round(rainPct) : null,
       weatherCode: code,
+      isFallback: false
     });
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to load weather data." },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    // Check if it's a timeout/abort error
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn("Weather API request timed out");
+    } else {
+      console.error("Weather API error:", error);
+    }
+    
+    // Always return fallback data instead of 500 error
+    return createSuccessResponse({
+      tempC: 20,
+      tempF: 68,
+      condition: "Clear",
+      humidityPercent: 50,
+      rainChancePercent: 10,
+      weatherCode: 0,
+      isFallback: true
+    });
   }
 }

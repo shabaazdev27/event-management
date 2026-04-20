@@ -1,8 +1,8 @@
 import { processScheduledCalculations } from "@/lib/venue-core";
 import { assertCronAuthorized } from "@/lib/api-validation";
-import { createErrorResponse, createSuccessResponse } from "@/lib/security";
+import { createErrorResponse, createSuccessResponse, validateGetRequest, validatePostRequest } from "@/lib/security";
 
-export async function GET(request: Request) {
+async function handleCronRequest(request: Request) {
   const unauthorized = assertCronAuthorized(request);
   if (unauthorized) return unauthorized;
 
@@ -18,7 +18,17 @@ export async function GET(request: Request) {
   }
 }
 
+export async function GET(request: Request) {
+  const validation = validateGetRequest(request);
+  if (!validation.valid) return validation.error!;
+
+  return handleCronRequest(request);
+}
+
 /** Some schedulers use POST; same auth as GET. */
 export async function POST(request: Request) {
-  return GET(request);
+  const validation = await validatePostRequest(request);
+  if (!validation.valid) return validation.error!;
+
+  return handleCronRequest(request);
 }

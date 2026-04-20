@@ -39,7 +39,7 @@ describe("Health Check Endpoint", () => {
     vi.stubEnv("GEMINI_API_KEY", "test-key");
     vi.stubEnv("APP_VERSION", "1.0.0");
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/health"));
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -54,7 +54,7 @@ describe("Health Check Endpoint", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("GEMINI_API_KEY", "");
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/health"));
     const data = await response.json();
 
     expect(data.status).toBe("degraded");
@@ -65,7 +65,7 @@ describe("Health Check Endpoint", () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("GEMINI_API_KEY", "");
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/health"));
     const data = await response.json();
 
     expect(data.checks.geminiApi).toBe("not_configured");
@@ -74,7 +74,7 @@ describe("Health Check Endpoint", () => {
   it("should include timestamp and version", async () => {
     vi.stubEnv("APP_VERSION", "2.0.0");
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/health"));
     const data = await response.json();
 
     expect(data.timestamp).toBeDefined();
@@ -83,7 +83,7 @@ describe("Health Check Endpoint", () => {
   });
 
   it("should return no-cache headers", async () => {
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/health"));
 
     expect(response.headers.get("Cache-Control")).toBe(
       "no-cache, no-store, must-revalidate"
@@ -95,7 +95,7 @@ describe("Health Check Endpoint", () => {
   it("should handle Firestore connection errors gracefully", async () => {
     vi.mocked(getDoc).mockRejectedValueOnce(new Error("Connection failed"));
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/health"));
     const data = await response.json();
 
     expect(response.status).toBe(503);

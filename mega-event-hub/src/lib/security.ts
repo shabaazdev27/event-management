@@ -4,7 +4,6 @@
  */
 
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
 /**
  * Comprehensive security headers following OWASP guidelines
@@ -28,10 +27,11 @@ export const securityHeaders = {
   // Strict Transport Security (HTTPS only)
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   
-  // Content Security Policy
   "Content-Security-Policy": [
     "default-src 'self'",
-    "script-src 'self' https://www.googletagmanager.com https://www.google-analytics.com",
+    `script-src 'self' ${
+      process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""
+    } https://www.googletagmanager.com https://www.google-analytics.com`,
     "style-src 'self'",
     "img-src 'self' data: https: blob:",
     "font-src 'self' data:",
@@ -86,15 +86,22 @@ export function withSecurityHeaders(response: NextResponse): NextResponse {
 }
 
 /**
- * Input sanitization to prevent XSS and injection attacks
+ * Input sanitization to prevent XSS and injection attacks.
+ * Uses a more comprehensive approach than simple regex.
  */
-export function sanitizeInput(input: string): string {
+export function sanitizeInput(input: string, maxLength: number = 10000): string {
+  if (!input) return "";
+  
   return input
     .replace(/[<>]/g, "") // Remove angle brackets
     .replace(/javascript:/gi, "") // Remove javascript: protocol
-    .replace(/on\w+=/gi, "") // Remove event handlers
+    .replace(/on\w+=/gi, "") // Remove event handlers (onclick, etc)
+    .replace(/expression\s*\(/gi, "") // Remove CSS expressions
+    .replace(/url\s*\(/gi, "") // Remove CSS URLs
+    .replace(/vbscript:/gi, "") // Remove vbscript:
+    .replace(/data:/gi, "") // Remove data: (prevents base64 XSS)
     .trim()
-    .slice(0, 10000); // Limit length
+    .slice(0, maxLength);
 }
 
 /**
@@ -106,15 +113,15 @@ export function validateJsonInput<T>(
 ): { valid: boolean; data?: T; errors?: string[] } {
   const errors: string[] = [];
   
-  if (!data || typeof data !== "object") {
+  if (!data || typeof data !== "object" || data === null) {
     return { valid: false, errors: ["Invalid input data"] };
   }
   
-  const obj = data as Record<string, unknown>;
+  const obj = { ...(data as Record<string, unknown>) };
   
   // Check required fields
   for (const field of requiredFields) {
-    if (!(field in obj) || obj[field] === undefined || obj[field] === null) {
+    if (!(field in obj) || obj[field] === undefined || obj[field] === null || (typeof obj[field] === "string" && (obj[field] as string).trim() === "")) {
       errors.push(`Missing required field: ${field}`);
     }
   }
@@ -143,7 +150,7 @@ export function isValidVenueId(venueId: unknown): venueId is string {
 }
 
 /**
- * Validate API key format
+ * Validate API key format (prevents timing attacks by checking length/format first)
  */
 export function isValidApiKey(apiKey: unknown): apiKey is string {
   if (typeof apiKey !== "string") return false;
@@ -161,7 +168,7 @@ export function generateRequestId(): string {
 /**
  * Extract client IP from request (with proxy support)
  */
-export function getClientIp(request: NextRequest): string {
+export function getClientIp(request: Request): string {
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) {
     return forwardedFor.split(",")[0]!.trim();
@@ -210,7 +217,7 @@ export function createSuccessResponse<T>(
  * Validate request method
  */
 export function validateMethod(
-  request: NextRequest,
+  request: Request,
   allowedMethods: string[]
 ): { valid: boolean; error?: NextResponse } {
   if (!allowedMethods.includes(request.method)) {
@@ -231,7 +238,7 @@ export function validateMethod(
  * Validate content type
  */
 export function validateContentType(
-  request: NextRequest,
+  request: Request,
   expectedType: string = "application/json"
 ): { valid: boolean; error?: NextResponse } {
   const contentType = request.headers.get("content-type");
@@ -252,7 +259,7 @@ export function validateContentType(
 /**
  * OWASP compliance check
  */
-export function validateRequest(request: NextRequest): {
+export function validateRequest(request: Request): {
   valid: boolean;
   requestId: string;
   clientIp: string;
@@ -273,4 +280,38 @@ export function validateRequest(request: NextRequest): {
   }
   
   return { valid: true, requestId, clientIp };
+}
+
+/**
+ * Standardize API request validation for POST routes
+ */
+export async function validatePostRequest(
+  request: Request,
+  allowedMethods: string[] = ["POST"]
+): Promise<{ valid: boolean; requestId: string; clientIp: string; error?: NextResponse }> {
+  const reqCheck = validateRequest(request);
+  if (!reqCheck.valid) return reqCheck;
+
+  const methodCheck = validateMethod(request, allowedMethods);
+  if (!methodCheck.valid) return { ...reqCheck, valid: false, error: methodCheck.error };
+
+  const typeCheck = validateContentType(request);
+  if (!typeCheck.valid) return { ...reqCheck, valid: false, error: typeCheck.error };
+
+  return reqCheck;
+}
+
+/**
+ * Standardize API request validation for GET routes
+ */
+export function validateGetRequest(
+  request: Request
+): { valid: boolean; requestId: string; clientIp: string; error?: NextResponse } {
+  const reqCheck = validateRequest(request);
+  if (!reqCheck.valid) return reqCheck;
+
+  const methodCheck = validateMethod(request, ["GET"]);
+  if (!methodCheck.valid) return { ...reqCheck, valid: false, error: methodCheck.error };
+
+  return reqCheck;
 }

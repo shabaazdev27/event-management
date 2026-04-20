@@ -8,9 +8,12 @@ import {
   validateLocation,
   validateMaxFlow,
 } from "@/lib/api-validation";
-import { createErrorResponse, createSuccessResponse } from "@/lib/security";
+import { createErrorResponse, createSuccessResponse, validatePostRequest } from "@/lib/security";
 
 export async function POST(request: Request) {
+  const validation = await validatePostRequest(request);
+  if (!validation.valid) return validation.error!;
+
   const auth = assertSensorsAuthorized(request);
   if (auth) return auth;
 

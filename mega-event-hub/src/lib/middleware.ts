@@ -3,7 +3,7 @@
  * Protects against abuse and implements security best practices.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { logger } from "./gcp-monitoring";
 import { sanitizeInput as sanitizeSecurityInput } from "./security";
@@ -100,7 +100,7 @@ const rateLimitStore = new RateLimitStore();
  * Rate limit middleware factory
  */
 export function createRateLimiter(config: RateLimitConfig) {
-  return async (req: NextRequest): Promise<NextResponse | null> => {
+  return async (req: Request): Promise<NextResponse | null> => {
     // Get client identifier (IP address or auth token)
     const clientId = getClientIdentifier(req);
     
@@ -111,7 +111,7 @@ export function createRateLimiter(config: RateLimitConfig) {
       
       logger.warn("Rate limit exceeded", {
         clientId,
-        endpoint: req.nextUrl.pathname,
+        endpoint: new URL(req.url).pathname,
       });
 
       return NextResponse.json(
@@ -144,7 +144,7 @@ export function createRateLimiter(config: RateLimitConfig) {
 /**
  * Get client identifier from request
  */
-function getClientIdentifier(req: NextRequest): string {
+function getClientIdentifier(req: Request): string {
   // Prefer a stable hash of auth credentials when present.
   // This avoids exposing token fragments in memory/logs.
   const authHeader = req.headers.get("authorization");
@@ -167,7 +167,7 @@ function getClientIdentifier(req: NextRequest): string {
 /**
  * Validate API key middleware
  */
-export function validateApiKey(req: NextRequest, envKey: string): NextResponse | null {
+export function validateApiKey(req: Request, envKey: string): NextResponse | null {
   const expectedKey = process.env[envKey];
   
   if (!expectedKey) {
@@ -189,7 +189,7 @@ export function validateApiKey(req: NextRequest, envKey: string): NextResponse |
 
   if (!providedKey || providedKey !== expectedKey) {
     logger.warn("Invalid API key attempt", {
-      endpoint: req.nextUrl.pathname,
+      endpoint: new URL(req.url).pathname,
       clientId: getClientIdentifier(req),
     });
 
@@ -205,7 +205,7 @@ export function validateApiKey(req: NextRequest, envKey: string): NextResponse |
 /**
  * Validate cron secret for scheduled jobs
  */
-export function validateCronSecret(req: NextRequest): NextResponse | null {
+export function validateCronSecret(req: Request): NextResponse | null {
   const expectedSecret = process.env.CRON_SECRET;
   
   if (!expectedSecret) {
@@ -226,7 +226,7 @@ export function validateCronSecret(req: NextRequest): NextResponse | null {
 
   if (!providedSecret || providedSecret !== expectedSecret) {
     logger.warn("Invalid cron secret attempt", {
-      endpoint: req.nextUrl.pathname,
+      endpoint: new URL(req.url).pathname,
     });
 
     return NextResponse.json(
@@ -241,7 +241,7 @@ export function validateCronSecret(req: NextRequest): NextResponse | null {
 /**
  * CORS middleware with configurable origins
  */
-export function corsMiddleware(req: NextRequest, allowedOrigins: string[]): NextResponse {
+export function corsMiddleware(req: Request, allowedOrigins: string[]): NextResponse {
   const origin = req.headers.get("origin");
   const response = NextResponse.next();
 

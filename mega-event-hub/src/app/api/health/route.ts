@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { logger } from "@/lib/gcp-monitoring";
-import { withSecurityHeaders } from "@/lib/security";
+import { withSecurityHeaders, validateGetRequest } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,7 +27,10 @@ interface HealthStatus {
 /**
  * GET /api/health - Health check endpoint
  */
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: Request): Promise<NextResponse> {
+  const validation = validateGetRequest(req);
+  if (!validation.valid) return validation.error!;
+
   const startTime = Date.now();
   const checks: HealthStatus["checks"] = {
     firestore: "ok",

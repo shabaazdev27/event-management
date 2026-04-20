@@ -1,12 +1,14 @@
-import { NextRequest } from "next/server";
 import { ApiValidationError, parseLatLon } from "@/lib/api-validation";
 import { labelForWeatherCode } from "@/lib/weather-codes";
-import { createErrorResponse, createSuccessResponse } from "@/lib/security";
+import { createErrorResponse, createSuccessResponse, validateGetRequest } from "@/lib/security";
 
-export async function GET(req: NextRequest) {
-  const latRaw = req.nextUrl.searchParams.get("lat");
-  const lonRaw = req.nextUrl.searchParams.get("lon");
-  const timezone = req.nextUrl.searchParams.get("timezone") || "auto";
+export async function GET(req: Request) {
+  const validation = validateGetRequest(req);
+  if (!validation.valid) return validation.error!;
+  const urlParams = new URL(req.url).searchParams;
+  const latRaw = urlParams.get("lat");
+  const lonRaw = urlParams.get("lon");
+  const timezone = urlParams.get("timezone") || "auto";
 
   let lat: number;
   let lon: number;

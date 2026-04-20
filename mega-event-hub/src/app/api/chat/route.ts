@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import {
   ApiValidationError,
@@ -9,7 +9,7 @@ import { createRateLimiter, RATE_LIMITS } from "@/lib/middleware";
 import { logger } from "@/lib/gcp-monitoring";
 import { pubSubManager } from "@/lib/gcp-pubsub";
 import { bigQueryManager, AnalyticsTable } from "@/lib/gcp-bigquery";
-import { createErrorResponse, createSuccessResponse } from "@/lib/security";
+import { createErrorResponse, createSuccessResponse, validateMethod, validateContentType } from "@/lib/security";
 import { getVenueState, type VenueState } from "@/lib/venue-core";
 
 // Rate limiter for chat endpoint
@@ -138,11 +138,19 @@ function shouldPreferDeterministic(lowerMessage: string, intent: ChatIntent): bo
 /**
  * POST /api/chat - AI chatbot endpoint with rate limiting and analytics
  */
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: Request): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
 
   try {
+    // Validate request method
+    const methodCheck = validateMethod(req, ["POST"]);
+    if (!methodCheck.valid) return methodCheck.error!;
+
+    // Validate content type
+    const typeCheck = validateContentType(req);
+    if (!typeCheck.valid) return typeCheck.error!;
+
     // Apply rate limiting
     const rateLimitResponse = await rateLimiter(req);
     if (rateLimitResponse) {

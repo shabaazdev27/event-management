@@ -27,7 +27,10 @@ describe("/api/cron/process", () => {
   });
 
   it("POST delegates to same handler as GET", async () => {
-    const res = await POST(new Request("http://localhost/api/cron/process"));
+    const res = await POST(new Request("http://localhost/api/cron/process", { 
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    }));
     expect(res.status).toBe(200);
     expect(processScheduledCalculations).toHaveBeenCalled();
   });

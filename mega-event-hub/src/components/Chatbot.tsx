@@ -1,7 +1,7 @@
 "use client";
 
 import { Send, Bot, Sparkles, Loader2 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useVenue } from "@/context/VenueContext";
 
 export default function Chatbot() {
@@ -16,6 +16,15 @@ export default function Chatbot() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const trackEvent = useCallback((name: string, params?: Record<string, unknown>) => {
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", name, {
+        venue_id: venue.id,
+        ...params,
+      });
+    }
+  }, [venue.id]);
+
   useEffect(() => {
     setMessages([
       {
@@ -25,36 +34,26 @@ export default function Chatbot() {
     ]);
     setInput("");
 
-    // Log chatbot initialization (client-side metric)
-    if (typeof window !== "undefined" && window.gtag) {
-      window.gtag("event", "chatbot_init", {
-        venue_id: venue.id,
-        venue_name: venue.name,
-      });
-    }
-  }, [venue.id, venue.name, venue.city]);
+    trackEvent("chatbot_init", { venue_name: venue.name });
+  }, [venue.id, venue.name, venue.city, trackEvent]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    
+
     const userMsg = input;
     const startTime = Date.now();
     setInput("");
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setLoading(true);
 
-    // Track message sent (client-side analytics)
-    if (typeof window !== "undefined" && window.gtag) {
-      window.gtag("event", "chatbot_message_sent", {
-        venue_id: venue.id,
-        message_length: userMsg.length,
-      });
-    }
+    trackEvent("chatbot_message_sent", {
+      message_length: userMsg.length,
+    });
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "X-Venue-ID": venue.id,
         },
@@ -66,18 +65,14 @@ export default function Chatbot() {
       });
 
       const responseTime = Date.now() - startTime;
-      
+
       const data = (await res.json()) as { reply?: string; error?: string };
-      
+
       if (!res.ok) {
-        // Track error
-        if (typeof window !== "undefined" && window.gtag) {
-          window.gtag("event", "chatbot_error", {
-            venue_id: venue.id,
-            error_type: data.error || "unknown",
-            response_time: responseTime,
-          });
-        }
+        trackEvent("chatbot_error", {
+          error_type: data.error || "unknown",
+          response_time: responseTime,
+        });
 
         setMessages((prev) => [
           ...prev,
@@ -89,14 +84,10 @@ export default function Chatbot() {
         return;
       }
 
-      // Track successful response
-      if (typeof window !== "undefined" && window.gtag) {
-        window.gtag("event", "chatbot_response_received", {
-          venue_id: venue.id,
-          response_time: responseTime,
-          reply_length: data.reply?.length || 0,
-        });
-      }
+      trackEvent("chatbot_response_received", {
+        response_time: responseTime,
+        reply_length: data.reply?.length || 0,
+      });
 
       setMessages((prev) => [
         ...prev,
@@ -106,13 +97,8 @@ export default function Chatbot() {
         },
       ]);
     } catch {
-      // Track network error
-      if (typeof window !== "undefined" && window.gtag) {
-        window.gtag("event", "chatbot_network_error", {
-          venue_id: venue.id,
-        });
-      }
-      
+      trackEvent("chatbot_network_error");
+
       setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I'm having trouble connecting right now." }]);
     } finally {
       setLoading(false);
